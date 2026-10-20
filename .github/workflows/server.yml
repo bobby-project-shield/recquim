@@ -51,3 +51,4 @@ jobs:
           timeout -k 15 20500 bash /tmp/step.sh || echo "step rc=$?"
           echo "----- diag.txt -----"
           tail -c 4000 diag.txt || true
+# trigger re-register
