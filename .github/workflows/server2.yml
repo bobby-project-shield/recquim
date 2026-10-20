@@ -29,8 +29,7 @@ jobs:
           echo "deb [signed-by=/usr/share/keyrings/winehq.gpg] https://dl.winehq.org/wine-builds/ubuntu/ ${CODENAME} main" | sudo tee /etc/apt/sources.list.d/winehq.list
           sudo apt-get update -y
           sudo apt-get install -y --install-recommends winehq-stable || sudo apt-get install -y wine64
-          echo "=== wine version ==="
-          wine --version
+          echo "wine version:"; wine --version
 
       - name: Download RebornRec 5.2.0
         run: |
@@ -48,62 +47,17 @@ jobs:
         run: |
           set +e
           HN=$(hostname)
-          echo "hostname: $HN"
+          echo "hostname resolved:"; getent hosts "$HN"
           sudo cp /etc/hosts /tmp/hosts.bak 2>/dev/null
           grep -vE "[[:space:]]${HN}([[:space:]]|$)" /tmp/hosts.bak > /tmp/hosts.new 2>/dev/null
           echo "127.0.0.1 ${HN}" >> /tmp/hosts.new
           sudo tee /etc/hosts < /tmp/hosts.new >/dev/null
           rm -f /tmp/hosts.new /tmp/hosts.bak
-          getent hosts "$HN" || true
-          echo "step ok"
+          getent hosts "$HN"
+          echo ok
 
-      - name: Boot Wine + RebornRec, dump diag
+      - name: Boot Wine + RebornRec
         run: |
-          set +e
-          export DISPLAY=:99
-          export WINEDEBUG=-all
-          DIAG=/tmp/diag.txt
-          : > "$DIAG"
-          echo "=== START $(date -u +%FT%TZ) ===" >> "$DIAG"
-          echo "wine: $(wine --version 2>&1)" >> "$DIAG"
-          Xvfb :99 -screen 0 1280x720x24 >/tmp/xvfb.log 2>&1 &
-          sleep 3
-          echo "--- wineboot ---" >> "$DIAG"
-          wineboot -u >> "$DIAG" 2>&1
-          echo "wineboot exit=$?" >> "$DIAG"
-          sleep 10
-          cat > /tmp/launch.sh <<'EOS'
-#!/bin/bash
-export DISPLAY=:99
-export WINEDEBUG=-all
-cd "$HOME/rebornrec" || exit 1
-echo "launcher pwd: $(pwd)"
-exec wine RebornRec.exe
-EOS
-          chmod +x /tmp/launch.sh
-          echo "--- start tmux ---" >> "$DIAG"
-          tmux new-session -d -s rr -x 220 -y 50 /tmp/launch.sh
-          echo "tmux rc=$?" >> "$DIAG"
-          sleep 100
-          echo "--- pane after 100s ---" >> "$DIAG"
-          tmux capture-pane -t rr -p >> "$DIAG" 2>&1
-          echo "--- send key 5 ---" >> "$DIAG"
-          tmux send-keys -t rr -l 5
-          sleep 30
-          echo "--- pane after key5 ---" >> "$DIAG"
-          tmux capture-pane -t rr -p >> "$DIAG" 2>&1
-          echo "--- listening ports ---" >> "$DIAG"
-          (ss -ltnp 2>/dev/null || netstat -ltnp 2>/dev/null) | grep -E '2056|2059' >> "$DIAG" 2>&1
-          echo "--- probes ---" >> "$DIAG"
-          for h in "127.0.0.1:2056" "$(hostname):2056"; do
-            c=$(curl -s -m6 -o /dev/null -w '%{http_code}' -H "Host: $h" http://127.0.0.1:2056/ || true)
-            echo "Host $h -> $c" >> "$DIAG"
-          done
-          echo "=== END $(date -u +%FT%TZ) ===" >> "$DIAG"
-          cp "$DIAG" diag.txt
-          git config user.name "recquim-server"
-          git config user.email "recquim-server@users.noreply.github.com"
-          git add -f diag.txt
-          git commit -m "diag $(date -u +%FT%TZ)" || true
-          git push origin HEAD:main || true
-          cat "$DIAG"
+          B64='c2V0ICtlCmV4cG9ydCBESVNQTEFZPTo5OQpleHBvcnQgV0lORURFQlVHPS1hbGwKRElBRz0vdG1wL2RpYWcudHh0CjogPiAiJERJQUciCmVjaG8gIj09PSBTVEFSVCAkKGRhdGUgLXUgKyVGVCVUWikgPT09IiA+PiAiJERJQUciCmVjaG8gIndpbmU6ICQod2luZSAtLXZlcnNpb24gMj4mMSkiID4+ICIkRElBRyIKWHZmYiA6OTkgLXNjcmVlbiAwIDEyODB4NzIweDI0ID4vdG1wL3h2ZmIubG9nIDI+JjEgJgpzbGVlcCAzCmVjaG8gIi0tLSB3aW5lYm9vdCAtLS0iID4+ICIkRElBRyIKd2luZWJvb3QgLXUgPj4gIiRESUFHIiAyPiYxCmVjaG8gIndpbmVib290IGV4aXQ9JD8iID4+ICIkRElBRyIKc2xlZXAgMTAKcHJpbnRmICcjIS9iaW4vYmFzaFxuZXhwb3J0IERJU1BMQVk9Ojk5XG5leHBvcnQgV0lORURFQlVHPS1hbGxcbmNkICIkSE9NRS9yZWJvcm5yZWMiIHx8IGV4aXQgMVxuZWNobyAibGF1bmNoZXIgcHdkOiAkKHB3ZCkiXG5leGVjIHdpbmUgUmVib3JuUmVjLmV4ZVxuJyA+IC90bXAvbGF1bmNoLnNoCmNobW9kICt4IC90bXAvbGF1bmNoLnNoCmVjaG8gIi0tLSBsYXVuY2guc2ggLS0tIiA+PiAiJERJQUciCmNhdCAvdG1wL2xhdW5jaC5zaCA+PiAiJERJQUciCmVjaG8gIi0tLSBzdGFydCB0bXV4IC0tLSIgPj4gIiRESUFHIgp0bXV4IG5ldy1zZXNzaW9uIC1kIC1zIHJyIC14IDIyMCAteSA1MCAvdG1wL2xhdW5jaC5zaAplY2hvICJ0bXV4IHJjPSQ/IiA+PiAiJERJQUciCnNsZWVwIDEwMAplY2hvICItLS0gcGFuZSBhZnRlciAxMDBzIC0tLSIgPj4gIiRESUFHIgp0bXV4IGNhcHR1cmUtcGFuZSAtdCByciAtcCA+PiAiJERJQUciIDI+JjEKZWNobyAiLS0tIHNlbmQga2V5IDUgLS0tIiA+PiAiJERJQUciCnRtdXggc2VuZC1rZXlzIC10IHJyIC1sIDUKc2xlZXAgMzAKZWNobyAiLS0tIHBhbmUgYWZ0ZXIga2V5NSAtLS0iID4+ICIkRElBRyIKdG11eCBjYXB0dXJlLXBhbmUgLXQgcnIgLXAgPj4gIiRESUFHIiAyPiYxCmVjaG8gIi0tLSBsaXN0ZW5pbmcgcG9ydHMgLS0tIiA+PiAiJERJQUciCihzcyAtbHRucCAyPi9kZXYvbnVsbCB8fCBuZXRzdGF0IC1sdG5wIDI+L2Rldi9udWxsKSB8IGdyZXAgLUUgJzIwNTZ8MjA1OScgPj4gIiRESUFHIiAyPiYxCmVjaG8gIi0tLSBwcm9iZXMgLS0tIiA+PiAiJERJQUciCmZvciBoIGluICIxMjcuMC4wLjE6MjA1NiIgIiQoaG9zdG5hbWUpOjIwNTYiOyBkbwogIGM9JChjdXJsIC1zIC1tNiAtbyAvZGV2L251bGwgLXcgJyV7aHR0cF9jb2RlfScgLUggIkhvc3Q6ICRoIiBodHRwOi8vMTI3LjAuMC4xOjIwNTYvIHx8IHRydWUpCiAgZWNobyAiSG9zdCAkaCAtPiAkYyIgPj4gIiRESUFHIgpkb25lCmVjaG8gIj09PSBFTkQgJChkYXRlIC11ICslRlQlVFopID09PSIgPj4gIiRESUFHIgpjcCAiJERJQUciIGRpYWcudHh0CmdpdCBjb25maWcgdXNlci5uYW1lICJyZWNxdWltLXNlcnZlciIKZ2l0IGNvbmZpZyB1c2VyLmVtYWlsICJyZWNxdWltLXNlcnZlckB1c2Vycy5ub3JlcGx5LmdpdGh1Yi5jb20iCmdpdCBhZGQgLWYgZGlhZy50eHQKZ2l0IGNvbW1pdCAtbSAiZGlhZyAkKGRhdGUgLXUgKyVGVCVUWikiIHx8IHRydWUKZ2l0IHB1c2ggb3JpZ2luIEhFQUQ6bWFpbiB8fCB0cnVlCmNhdCAiJERJQUci'
+          echo "$B64" | base64 -d > /tmp/step.sh
+          bash /tmp/step.sh
