@@ -17,16 +17,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Wine + tools
+      - name: Install WineHQ + tools
         run: |
           set -e
           sudo apt-get update -y
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y curl unzip tmux xvfb winbind ca-certificates gnupg wget
-          wget -qO- https://dl.winehq.org/wine-builds/winehq.key | gpg --dearmor | sudo tee /usr/share/keyrings/winehq.gpg >/dev/null
-          echo "deb [signed-by=/usr/share/keyrings/winehq.gpg] https://dl.winehq.org/wine-builds/ubuntu/ $(. /etc/os-release && echo $VERSION_CODENAME) main" | sudo tee /etc/apt/sources.list.d/winehq.list >/dev/null
-          sudo apt-get update -y || true
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y curl unzip tmux xvfb ca-certificates gnupg wget software-properties-common
+          sudo dpkg --add-architecture i386
+          wget -qO /tmp/winehq.key https://dl.winehq.org/wine-builds/winehq.key
+          sudo gpg --dearmor -o /usr/share/keyrings/winehq.gpg /tmp/winehq.key
+          CODENAME=$(. /etc/os-release && echo $VERSION_CODENAME)
+          echo "deb [signed-by=/usr/share/keyrings/winehq.gpg] https://dl.winehq.org/wine-builds/ubuntu/ ${CODENAME} main" | sudo tee /etc/apt/sources.list.d/winehq.list
+          sudo apt-get update -y
           sudo apt-get install -y --install-recommends winehq-stable || sudo apt-get install -y wine64
-          wine --version || wine64 --version
+          echo "=== wine version ==="
+          wine --version
 
       - name: Download RebornRec 5.2.0
         run: |
@@ -45,13 +49,12 @@ jobs:
           set +e
           HN=$(hostname)
           echo "hostname: $HN"
-          getent hosts "$HN" || true
           sudo cp /etc/hosts /tmp/hosts.bak 2>/dev/null
           grep -vE "[[:space:]]${HN}([[:space:]]|$)" /tmp/hosts.bak > /tmp/hosts.new 2>/dev/null
           echo "127.0.0.1 ${HN}" >> /tmp/hosts.new
           sudo tee /etc/hosts < /tmp/hosts.new >/dev/null
           rm -f /tmp/hosts.new /tmp/hosts.bak
-          echo "after:"; getent hosts "$HN" || true
+          getent hosts "$HN" || true
           echo "step ok"
 
       - name: Boot Wine + RebornRec, dump diag
@@ -63,16 +66,24 @@ jobs:
           : > "$DIAG"
           echo "=== START $(date -u +%FT%TZ) ===" >> "$DIAG"
           echo "wine: $(wine --version 2>&1)" >> "$DIAG"
-          echo "rebornrec dir:" >> "$DIAG"
-          ls "$HOME/rebornrec" >> "$DIAG" 2>&1
           Xvfb :99 -screen 0 1280x720x24 >/tmp/xvfb.log 2>&1 &
           sleep 3
-          echo "--- wineboot -u ---" >> "$DIAG"
+          echo "--- wineboot ---" >> "$DIAG"
           wineboot -u >> "$DIAG" 2>&1
           echo "wineboot exit=$?" >> "$DIAG"
           sleep 10
-          echo "--- launch RebornRec in tmux ---" >> "$DIAG"
-          tmux new -d -s rr -x 200 -y 50 "cd \$HOME/rebornrec && DISPLAY=:99 WINEDEBUG=-all wine RebornRec.exe 2>&1 | tee -a /tmp/rr.log"
+          cat > /tmp/launch.sh <<'EOS'
+#!/bin/bash
+export DISPLAY=:99
+export WINEDEBUG=-all
+cd "$HOME/rebornrec" || exit 1
+echo "launcher pwd: $(pwd)"
+exec wine RebornRec.exe
+EOS
+          chmod +x /tmp/launch.sh
+          echo "--- start tmux ---" >> "$DIAG"
+          tmux new-session -d -s rr -x 220 -y 50 /tmp/launch.sh
+          echo "tmux rc=$?" >> "$DIAG"
           sleep 100
           echo "--- pane after 100s ---" >> "$DIAG"
           tmux capture-pane -t rr -p >> "$DIAG" 2>&1
@@ -88,8 +99,6 @@ jobs:
             c=$(curl -s -m6 -o /dev/null -w '%{http_code}' -H "Host: $h" http://127.0.0.1:2056/ || true)
             echo "Host $h -> $c" >> "$DIAG"
           done
-          echo "--- rr.log ---" >> "$DIAG"
-          tail -80 /tmp/rr.log >> "$DIAG" 2>&1
           echo "=== END $(date -u +%FT%TZ) ===" >> "$DIAG"
           cp "$DIAG" diag.txt
           git config user.name "recquim-server"
