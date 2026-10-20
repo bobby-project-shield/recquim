@@ -1,0 +1,30 @@
+=== START 2026-10-20T12:00:12Z ===
+wine: wine-9.0 (Ubuntu 9.0~repack-4build3)
+rebornrec dir:
+RebornRec.exe
+discord_game_sdk.dll
+--- wineboot -u ---
+wine: created the configuration directory '/home/runner/.wine'
+wine: failed to open L"C:\\windows\\syswow64\\rundll32.exe": c0000135
+wine: configuration in L"/home/runner/.wine" has been updated.
+wine: configuration in L"/home/runner/.wine" has been updated.
+wineboot exit=0
+--- launch RebornRec in tmux ---
+--- pane after 100s ---
+no server running on /tmp/tmux-1001/default
+--- send key 5 ---
+--- pane after key5 ---
+no server running on /tmp/tmux-1001/default
+--- listening ports ---
+--- probes ---
+Host 127.0.0.1:2056 -> 000
+Host runnervmxehtw:2056 -> 000
+--- rr.log ---
+Setting up... (May take a minute to download everything.)
+Unhandled Exception: System.IO.IOException: Invalid handle.
+   at System.ConsolePal.GetBufferInfo(Boolean, Boolean&) + 0x199
+   at System.ConsolePal.Clear() + 0x3f
+   at start.Setup.setup() + 0xa63
+   at start.Program.Main(String[] args) + 0x60
+   at RebornRec!<BaseAddress>+0x47d9c3
+=== END 2026-10-20T12:02:49Z ===
