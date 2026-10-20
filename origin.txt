@@ -1,1 +1,1 @@
-https://example.trycloudflare.com
+https://pair-warehouse-leader-loc.trycloudflare.com
