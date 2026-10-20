@@ -1,20 +1,13 @@
-=== START 2026-10-20T12:26:30Z ===
+=== START 2026-10-20T12:42:58Z ===
 wine: wine-11.0
-hosts: 127.0.0.1       runnervmxehtw
---- wineboot (max 120s) ---
-wine: created the configuration directory '/home/runner/.wine'
-wineboot rc=124
---- launch.sh ---
-#!/bin/bash
-export DISPLAY=:99
-export WINEDEBUG=-all
-cd "$HOME/rebornrec" || exit 1
-echo "pwd: $(pwd)"
-exec wine RebornRec.exe
---- tmux start ---
+hosts: 127.0.0.1       STREAM runnervmxehtw
+--- wineboot ---
+wineboot rc=0
 tmux rc=0
---- pane @60s ---
-pwd: /home/runner/rebornrec
+--- menu pane ---
+Welcome to RebornRec 5.2.0!
+Is this your first time using RebornRec?
+Press (Y) for Yes, or (N) for No
 
 
 
@@ -62,13 +55,11 @@ pwd: /home/runner/rebornrec
 
 
 
-
-
---- key 5 ---
---- pane @105s ---
-pwd: /home/runner/rebornrec
-5
-
+sent 5
+--- server pane ---
+Welcome to RebornRec 5.2.0!
+Is this your first time using RebornRec?
+Press (Y) for Yes, or (N) for No
 
 
 
@@ -119,62 +110,6 @@ pwd: /home/runner/rebornrec
 --- ports ---
 --- probes ---
 Host 127.0.0.1:2056 -> 000
+Host localhost:2056 -> 000
 Host runnervmxehtw:2056 -> 000
---- final pane ---
-pwd: /home/runner/rebornrec
-5
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
---- keep running for probe window ---
---- ports (post) ---
-=== END 2026-10-20T12:30:42Z ===
-X connection to :99 broken (explicit kill or server shutdown).
-X connection to :99 broken (explicit kill or server shutdown).
-XIO:  fatal IO error 2 (No such file or directory) on X server ":99"
-      after 150 requests (150 known processed) with 1 events remaining.
+=== END 2026-10-20T12:47:13Z ===
