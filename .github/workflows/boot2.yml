@@ -1,0 +1,49 @@
+name: boot2
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/10 * * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  serve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wine
+        run: |
+          set -e
+          sudo apt-get update -y
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y curl unzip tmux xvfb ca-certificates gnupg wget
+          sudo dpkg --add-architecture i386
+          wget -qO /tmp/w.key https://dl.winehq.org/wine-builds/winehq.key
+          sudo gpg --dearmor -o /usr/share/keyrings/winehq.gpg /tmp/w.key
+          CN=$(. /etc/os-release && echo $VERSION_CODENAME)
+          echo "deb [signed-by=/usr/share/keyrings/winehq.gpg] https://dl.winehq.org/wine-builds/ubuntu/ ${CN} main" | sudo tee /etc/apt/sources.list.d/winehq.list
+          sudo apt-get update -y
+          sudo apt-get install -y --install-recommends winehq-stable || sudo apt-get install -y wine64
+          wine --version
+
+      - name: RebornRec
+        run: |
+          set -e
+          curl -sL -o /tmp/rr.zip https://github.com/aqquad/RebornRec/releases/download/v5.2.0/RebornRec_5.2.0.zip
+          mkdir -p "$HOME/rebornrec"
+          unzip -oq /tmp/rr.zip -d "$HOME/rebornrec/"
+          if [ ! -f "$HOME/rebornrec/RebornRec.exe" ]; then
+            sub=$(find "$HOME/rebornrec" -maxdepth 2 -name RebornRec.exe | head -1)
+            [ -n "$sub" ] && cp -r "$(dirname "$sub")/." "$HOME/rebornrec/"
+          fi
+          test -f "$HOME/rebornrec/RebornRec.exe"
+
+      - name: Run diagnostics
+        run: |
+          echo "c2V0ICtlCmV4cG9ydCBESVNQTEFZPTo5OQpleHBvcnQgV0lORURFQlVHPS1hbGwKRElBRz0vdG1wL2RpYWcudHh0CjogPiAiJERJQUciCkhOPSQoaG9zdG5hbWUpCnNheSgpeyBlY2hvICIkQCIgPj4gIiRESUFHIjsgfQoKc2F5ICI9PT0gU1RBUlQgJChkYXRlIC11ICslRlQlVFopID09PSIKc2F5ICJ3aW5lOiAkKHdpbmUgLS12ZXJzaW9uIDI+JjEpIgoKIyBob3N0bmFtZSAtPiBsb29wYmFjawpzdWRvIGNwIC9ldGMvaG9zdHMgL3RtcC9oLmJhayAyPi9kZXYvbnVsbApncmVwIC12RSAiW1s6c3BhY2U6XV0ke0hOfShbWzpzcGFjZTpdXXwkKSIgL3RtcC9oLmJhayA+IC90bXAvaC5uZXcgMj4vZGV2L251bGwKZWNobyAiMTI3LjAuMC4xICR7SE59IiA+PiAvdG1wL2gubmV3CnN1ZG8gdGVlIC9ldGMvaG9zdHMgPCAvdG1wL2gubmV3ID4vZGV2L251bGwKc2F5ICJob3N0czogJChnZXRlbnQgaG9zdHMgIiRITiIpIgoKIyBYIGRpc3BsYXkKcGdyZXAgWHZmYiA+L2Rldi9udWxsIHx8IChYdmZiIDo5OSAtc2NyZWVuIDAgMTI4MHg3MjB4MjQgPi90bXAveHZmYi5sb2cgMj4mMSAmKQpzbGVlcCAyCgojIHdpbmUgcHJlZml4LCBib3VuZGVkCnNheSAiLS0tIHdpbmVib290IChtYXggMTIwcykgLS0tIgp0aW1lb3V0IDEyMCB3aW5lYm9vdCAtdSA+PiAiJERJQUciIDI+JjEKc2F5ICJ3aW5lYm9vdCByYz0kPyIKc2xlZXAgNQoKIyBsYXVuY2hlciBzY3JpcHQgKHJlYWwgUFRZIHZpYSB0bXV4KQpjYXQgPiAvdG1wL2xhdW5jaC5zaCA8PCdFT1MnCiMhL2Jpbi9iYXNoCmV4cG9ydCBESVNQTEFZPTo5OQpleHBvcnQgV0lORURFQlVHPS1hbGwKY2QgIiRIT01FL3JlYm9ybnJlYyIgfHwgZXhpdCAxCmVjaG8gInB3ZDogJChwd2QpIgpleGVjIHdpbmUgUmVib3JuUmVjLmV4ZQpFT1MKY2htb2QgK3ggL3RtcC9sYXVuY2guc2gKc2F5ICItLS0gbGF1bmNoLnNoIC0tLSIKY2F0IC90bXAvbGF1bmNoLnNoID4+ICIkRElBRyIKCnNheSAiLS0tIHRtdXggc3RhcnQgLS0tIgp0bXV4IGtpbGwtc2Vzc2lvbiAtdCByciAyPi9kZXYvbnVsbAp0bXV4IG5ldy1zZXNzaW9uIC1kIC1zIHJyIC14IDIyMCAteSA1MCAvdG1wL2xhdW5jaC5zaApzYXkgInRtdXggcmM9JD8iCgpzbGVlcCA2MApzYXkgIi0tLSBwYW5lIEA2MHMgLS0tIgp0bXV4IGNhcHR1cmUtcGFuZSAtdCByciAtcCA+PiAiJERJQUciIDI+JjEKc2F5ICItLS0ga2V5IDUgLS0tIgp0bXV4IHNlbmQta2V5cyAtdCByciAtbCA1CnNsZWVwIDQ1CnNheSAiLS0tIHBhbmUgQDEwNXMgLS0tIgp0bXV4IGNhcHR1cmUtcGFuZSAtdCByciAtcCA+PiAiJERJQUciIDI+JjEKCnNheSAiLS0tIHBvcnRzIC0tLSIKKHNzIC1sdG5wIDI+L2Rldi9udWxsIHx8IG5ldHN0YXQgLWx0bnAgMj4vZGV2L251bGwpIHwgZ3JlcCAtRSAnMjA1NnwyMDU5JyA+PiAiJERJQUciIDI+JjEKc2F5ICItLS0gcHJvYmVzIC0tLSIKZm9yIGggaW4gIjEyNy4wLjAuMToyMDU2IiAiJHtITn06MjA1NiI7IGRvCiAgYz0kKHRpbWVvdXQgOCBjdXJsIC1zIC1tNiAtbyAvZGV2L251bGwgLXcgJyV7aHR0cF9jb2RlfScgLUggIkhvc3Q6ICRoIiBodHRwOi8vMTI3LjAuMC4xOjIwNTYvIDI+L2Rldi9udWxsIHx8IHRydWUpCiAgc2F5ICJIb3N0ICRoIC0+ICRjIgpkb25lCgojIFJlYm9yblJlYydzIG93biBsb2cKaWYgWyAtZiAiJEhPTUUvcmVib3JucmVjL3JyLmxvZyIgXTsgdGhlbgogIHNheSAiLS0tIHJyLmxvZyAtLS0iCiAgdGFpbCAtYyAzMDAwICIkSE9NRS9yZWJvcm5yZWMvcnIubG9nIiA+PiAiJERJQUciIDI+JjEKZmkKCnNheSAiPT09IEVORCAkKGRhdGUgLXUgKyVGVCVUWikgPT09IgoKY3AgIiRESUFHIiBkaWFnLnR4dApnaXQgY29uZmlnIHVzZXIubmFtZSAicmVjcXVpbS1zZXJ2ZXIiCmdpdCBjb25maWcgdXNlci5lbWFpbCAicmVjcXVpbS1zZXJ2ZXJAdXNlcnMubm9yZXBseS5naXRodWIuY29tIgpnaXQgYWRkIC1mIGRpYWcudHh0CmdpdCBjb21taXQgLW0gImRpYWcgJChkYXRlIC11ICslRlQlVFopIiB8fCB0cnVlCnRpbWVvdXQgNjAgZ2l0IHB1c2ggb3JpZ2luIEhFQUQ6bWFpbiB8fCB0cnVlCmVjaG8gIkRJQUcgRE9ORSI=" | base64 -d > /tmp/step.sh
+          timeout 600 bash /tmp/step.sh || echo "step rc=$?"
+          echo "----- diag.txt -----"
+          cat diag.txt || true
