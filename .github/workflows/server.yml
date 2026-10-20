@@ -1,0 +1,114 @@
+name: RebornRec Server
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: rebornrec-server
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  serve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Wine + tools
+        run: |
+          set -e
+          sudo apt-get update -y
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y curl unzip tmux xvfb winbind ca-certificates gnupg wget
+          wget -qO- https://dl.winehq.org/wine-builds/winehq.key | gpg --dearmor | sudo tee /usr/share/keyrings/winehq.gpg >/dev/null
+          echo "deb [signed-by=/usr/share/keyrings/winehq.gpg] https://dl.winehq.org/wine-builds/ubuntu/ $(. /etc/os-release && echo $VERSION_CODENAME) main" | sudo tee /etc/apt/sources.list.d/winehq.list >/dev/null
+          sudo apt-get update -y || true
+          sudo apt-get install -y --install-recommends winehq-stable || sudo apt-get install -y wine64
+          wine --version || wine64 --version
+
+      - name: Download RebornRec 5.2.0
+        run: |
+          set -e
+          curl -sL -o /tmp/rr.zip https://github.com/aqquad/RebornRec/releases/download/v5.2.0/RebornRec_5.2.0.zip
+          mkdir -p "$HOME/rebornrec"
+          unzip -oq /tmp/rr.zip -d "$HOME/rebornrec/"
+          if [ ! -f "$HOME/rebornrec/RebornRec.exe" ]; then
+            sub=$(find "$HOME/rebornrec" -maxdepth 2 -name RebornRec.exe | head -1)
+            [ -n "$sub" ] && cp -r "$(dirname "$sub")/." "$HOME/rebornrec/"
+          fi
+          test -f "$HOME/rebornrec/RebornRec.exe"
+
+      - name: Fix hostname mapping
+        run: |
+          IP=$(hostname -I | awk '{print $1}')
+          HN=$(hostname)
+          sudo grep -v -F "$HN" /etc/hosts > /tmp/hosts.new || true
+          printf '%s\t%s\n' "$IP" "$HN" | sudo tee -a /tmp/hosts.new >/dev/null
+          sudo cp /tmp/hosts.new /etc/hosts
+          echo "hostname $HN -> $IP"
+
+      - name: Start RebornRec
+        run: |
+          Xvfb :99 -screen 0 1280x720x24 >/tmp/xvfb.log 2>&1 &
+          sleep 2
+          tmux new -d -s rr -x 200 -y 50 "cd $HOME/rebornrec && DISPLAY=:99 WINEDEBUG=-all wine RebornRec.exe 2>&1 | tee -a /tmp/rr.log"
+          sleep 50
+          tmux send-keys -t rr -l 5
+          sleep 10
+          IP=$(hostname -I | awk '{print $1}')
+          curl -s -m6 -o /dev/null -w 'internal probe: %{http_code}\n' -H "Host: $IP:2056" http://127.0.0.1:2056/
+
+      - name: Start tunnel and publish origin
+        id: tunnel
+        run: |
+          set -e
+          curl -sL -o /tmp/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x /tmp/cloudflared
+          IP=$(hostname -I | awk '{print $1}')
+          nohup /tmp/cloudflared tunnel --url http://localhost:2056 --http-host-header "$IP:2056" >/tmp/tunnel.log 2>&1 &
+          URL=""
+          for i in $(seq 1 90); do
+            URL=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/tunnel.log | head -1 || true)
+            [ -n "$URL" ] && break
+            sleep 2
+          done
+          [ -n "$URL" ] || { echo "TUNNEL FAILED"; tail -30 /tmp/tunnel.log; exit 1; }
+          echo "tunnel: $URL"
+          echo "$URL" > origin.txt
+          git config user.name "recquim-server"
+          git config user.email "recquim-server@users.noreply.github.com"
+          git add origin.txt
+          git commit -m "origin $(date -u +%FT%TZ)"
+          git push origin HEAD:main || { git pull --rebase origin main; git push origin HEAD:main; }
+
+      - name: Watchdog
+        run: |
+          IP=$(hostname -I | awk '{print $1}')
+          for i in $(seq 1 320); do
+            code=$(curl -s -m5 -o /dev/null -w '%{http_code}' -H "Host: $IP:2056" http://127.0.0.1:2056/stupid/api/version || true)
+            if [ "$code" != "200" ]; then
+              echo "[$(date -u +%FT%TZ)] API=$code, restarting app"
+              tmux kill-session -t rr 2>/dev/null || true
+              pkill -f 'RebornRec.ex[e]' 2>/dev/null || true
+              sleep 3
+              tmux new -d -s rr -x 200 -y 50 "cd $HOME/rebornrec && DISPLAY=:99 WINEDEBUG=-all wine RebornRec.exe 2>&1 | tee -a /tmp/rr.log"
+              sleep 50
+              tmux send-keys -t rr -l 5
+            fi
+            if ! pgrep -f 'cloudflare[d]' >/dev/null; then
+              echo "[$(date -u +%FT%TZ)] tunnel dead, restarting"
+              nohup /tmp/cloudflared tunnel --url http://localhost:2056 --http-host-header "$IP:2056" >/tmp/tunnel2.log 2>&1 &
+              sleep 15
+              NEW=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/tunnel2.log | head -1 || true)
+              if [ -n "$NEW" ]; then
+                echo "$NEW" > origin.txt
+                git add origin.txt
+                git commit -m "origin $(date -u +%FT%TZ)" && git push origin HEAD:main || true
+              fi
+            fi
+            sleep 60
+          done
