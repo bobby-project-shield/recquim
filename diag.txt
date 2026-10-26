@@ -1,13 +1,13 @@
-=== START 2026-10-26T02:35:51Z ===
+=== START 2026-10-26T07:06:57Z ===
 wine: wine-11.0
-hostname runnervmr9t6g -> 127.0.0.1       STREAM runnervmr9t6g
+hosts: 127.0.0.1       STREAM runnervmr9t6g
 --- wineboot ---
-wineboot rc=124
+wineboot rc=0
 tmux rc=0
-first-run prompt at 0s, main menu at 0s
---- pane before Start Server ---
-cwd: /home/runner/rebornrec
-Setting up... (May take a minute to download everything.)
+--- menu pane ---
+Welcome to RebornRec 5.2.0!
+Is this your first time using RebornRec?
+Press (Y) for Yes, or (N) for No
 
 
 
@@ -55,12 +55,7 @@ Setting up... (May take a minute to download everything.)
 
 
 
-
-sent '5' (attempt 1)
-sent '5' (attempt 2)
-sent '5' (attempt 3)
-sent '5' (attempt 4)
-port 2056 after 0s
+sent 5
 --- server pane ---
 Welcome to RebornRec 5.2.0!
 Is this your first time using RebornRec?
@@ -113,8 +108,8 @@ Press (Y) for Yes, or (N) for No
 
 
 --- ports ---
---- local probe ---
+--- probes ---
 Host 127.0.0.1:2056 -> 000
+Host localhost:2056 -> 000
 Host runnervmr9t6g:2056 -> 000
-FATAL: RebornRec never bound 2056
-=== END 2026-10-26T02:54:31Z ===
+=== END 2026-10-26T07:11:11Z ===
